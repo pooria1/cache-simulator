@@ -8,9 +8,8 @@ import (
 
 // Operations enums
 const (
-	DataStore       = 0
-	DataLoad        = 1
-	InstructionLoad = 2
+	DataStore = 0
+	DataLoad  = 1
 )
 
 // Tag is an alias for the tab (variable size byte array)
@@ -50,7 +49,16 @@ func (c *Cache) Init() error {
 	if c.Options == nil {
 		return fmt.Errorf("unable to instantiate cache: options not configured")
 	}
-
+	if c.Options.HitPolicy == "wt" {
+		c.Options.HitPolicy = "WRITE BACK"
+	} else {
+		c.Options.HitPolicy = "WRITE THROUGH"
+	}
+	if c.Options.MissPolicy == "wa" {
+		c.Options.MissPolicy = "WRITE ALLOCATE"
+	} else {
+		c.Options.MissPolicy = "NO WRITE ALLOCATE"
+	}
 	o := c.Options
 
 	// Compute cache info
@@ -75,19 +83,6 @@ func (c *Cache) Init() error {
 		}
 	}
 
-	if o.Debug {
-		fmt.Printf("%15s\t%-3v \n", "Cache Size:", o.Size)
-		fmt.Printf("%15s\t%-3v \n", "Associativity:", o.Assoc)
-		fmt.Printf("%15s\t%-3v \n", "Block Size:", o.BlockSize)
-		fmt.Printf("%15s\t%-3v \n", "Replacement: LRU")
-		fmt.Printf("%15s\t%-3v \n", "Write Back:", o.HitPolicy)
-		fmt.Printf("%15s\t%-3v sets\n", "Num Sets:", c.NumberOfSets)
-		fmt.Printf("%15s\t%-3v bits\n", "Tag Size:", 64-c.SetNumber-c.BlockOffset)
-		fmt.Printf("%15s\t%-3v bits\n", "Index Size:", c.SetNumber)
-		fmt.Printf("%15s\t%-3v bits\n", "Block Offset:", c.BlockOffset)
-		fmt.Printf("%15s\t%-3v \n", "Total Bits:", c.TotalBits)
-	}
-
 	c.Stats = new(Statistics)
 	return nil
 }
@@ -103,9 +98,6 @@ func (c *Cache) Execute(op int, address string) error {
 
 	// Handle Hit/Miss
 	hit, index := c.Lookup(set, tag)
-	//if c.Options.Debug {
-	//fmt.Printf("%s: tag %b, set: %b, hit: %v, index: %b, offset: %b\n", Operation(op), tag, set, hit, index, offset)
-	//}
 
 	if op == DataStore {
 		// Write
@@ -156,9 +148,6 @@ func selectiveClear(n uint64, pos uint64) uint64 {
 // Lookup checks the tag array to determines if a block is in the cache
 // and modifies stats accordingly
 func (c *Cache) Lookup(set uint64, tag Tag) (bool, uint64) {
-	if c.Options.Debug {
-		fmt.Printf("set: %v, number of sets: %v\n", set, c.NumberOfSets)
-	}
 
 	for index := range c.TagArray[set] {
 		if c.TagArray[set][index] == tag {
@@ -182,6 +171,9 @@ func (c *Cache) Write(set uint64, index uint64, tag Tag, hit bool) error {
 // Read performs a cache read
 func (c *Cache) Read(set uint64, index uint64, tag Tag, hit bool) error {
 	// Reads never modify a block
+	if hit == false && len(c.TagArray[set]) == c.Options.Assoc {
+		c.Stats.Replaces++
+	}
 	err := c.Replace(set, index, tag, hit, false)
 	return err
 }
@@ -189,11 +181,6 @@ func (c *Cache) Read(set uint64, index uint64, tag Tag, hit bool) error {
 // Replace executes a replacement using the proper replacement policy
 func (c *Cache) Replace(set uint64, index uint64, tag Tag, hit bool, modify bool) error {
 	var eviction bool
-
-	if c.Options.Debug {
-		fmt.Printf("-----------------------------------PRE OP\n")
-		fmt.Printf("Set: %v\nTag: %v\nHit: %v\n", c.TagArray[set], tag, hit)
-	}
 
 	// Retrieve from memory
 	if !hit {
@@ -203,20 +190,13 @@ func (c *Cache) Replace(set uint64, index uint64, tag Tag, hit bool, modify bool
 	eviction = c.LRU(set, index, tag, hit, modify)
 
 	if c.Options.HitPolicy == "WRITE BACK" {
-		// For WriteBack, we write to mem on eviction
-		// If data has been modified
 		if eviction {
 			c.Stats.Writes++
 		}
 	} else if c.Options.HitPolicy == "WRITE THROUGH" && modify {
-		// For WriteThrough, we always write to mem
 		c.Stats.Writes++
 	}
 
-	if c.Options.Debug {
-		fmt.Printf("-----------------------------------POST OP\n")
-		fmt.Printf("Set: %v\nTag: %v\nHit: %v\n", c.TagArray[set], tag, hit)
-	}
 	return nil
 }
 
