@@ -33,20 +33,20 @@ func main() {
 		Size:       uint64(dataCacheSize),
 		Assoc:      assoc,
 		BlockSize:  uint64(blockSize),
-		HitPolicy:  wm,
-		MissPolicy: wh,
+		HitPolicy:  wh,
+		MissPolicy: wm,
 	}
 	instructionCacheOptions := &core.Options{
 		Size:       uint64(instructionCacheSize),
 		Assoc:      assoc,
 		BlockSize:  uint64(blockSize),
-		HitPolicy:  wm,
-		MissPolicy: wh,
+		HitPolicy:  wh,
+		MissPolicy: wm,
 	}
 	// Start Cache
-	dateCache := &core.Cache{Options: dataCacheOptions}
+	dataCache := &core.Cache{Options: dataCacheOptions}
 	instructionCache := &core.Cache{Options: instructionCacheOptions}
-	dateCache.Init()
+	dataCache.Init()
 	instructionCache.Init()
 
 	for {
@@ -74,34 +74,36 @@ func main() {
 				fmt.Println(err)
 			}
 			for k, _ := range instructionCache.TagArray {
-				dateCache.TagArray[k] = instructionCache.TagArray[k]
+				dataCache.DirtyArray[k] = instructionCache.DirtyArray[k]
+				dataCache.TagArray[k] = instructionCache.TagArray[k]
 			}
 			continue
 		}
-		err = dateCache.Execute(op, address)
-		dateCache.Stats.Accesses++
+		err = dataCache.Execute(op, address)
+		dataCache.Stats.Accesses++
 		if err != nil {
 			fmt.Println(err)
 		}
 		for k, _ := range instructionCache.TagArray {
-			instructionCache.TagArray[k] = dateCache.TagArray[k]
+			instructionCache.DirtyArray[k] = dataCache.DirtyArray[k]
+			instructionCache.TagArray[k] = dataCache.TagArray[k]
 		}
 	}
 
 	// Output
 	fmt.Println("***CACHE SETTINGS***")
 	if cacheType == 1 {
-		fmt.Println("Unified I- D-dateCache")
+		fmt.Println("Split I- D-dataCache")
 		fmt.Println("I-cache size:", instructionCache.Options.Size)
-		fmt.Println("D-cache size:", dateCache.Options.Size)
+		fmt.Println("D-cache size:", dataCache.Options.Size)
 	} else {
-		fmt.Println("Split I- D-dateCache")
-		fmt.Println("Size:", dateCache.Options.Size)
+		fmt.Println("Unified I- D-dataCache")
+		fmt.Println("Size:", dataCache.Options.Size)
 	}
-	fmt.Println("Associativity:", dateCache.Options.Assoc)
-	fmt.Println("Block Size:", dateCache.Options.BlockSize)
-	fmt.Println("Write Policy:", dateCache.Options.HitPolicy)
-	fmt.Println("Allocation Policy:", dateCache.Options.MissPolicy)
+	fmt.Println("Associativity:", dataCache.Options.Assoc)
+	fmt.Println("Block Size:", dataCache.Options.BlockSize)
+	fmt.Println("Write Policy:", dataCache.Options.HitPolicy)
+	fmt.Println("Allocation Policy:", dataCache.Options.MissPolicy)
 
 	fmt.Println("\n***CACHE STATISTICS***")
 	fmt.Println("INSTRUCTIONS")
@@ -117,10 +119,10 @@ func main() {
 
 	fmt.Println("DATA")
 	fmt.Println("INSTRUCTIONS")
-	fmt.Println("accesses:", dateCache.Stats.Accesses)
-	fmt.Println("misses:", dateCache.Stats.Misses)
-	fmt.Print("miss rate: ", dateCache.Stats.CalculateMissRate())
-	fmt.Printf(" (hit rate: %.4f)\n", 1-dateCache.Stats.CalculateMissRate())
-	fmt.Print("replaces: ", dateCache.Stats.Replaces)
+	fmt.Println("accesses:", dataCache.Stats.Accesses)
+	fmt.Println("misses:", dataCache.Stats.Misses)
+	fmt.Print("miss rate: ", dataCache.Stats.CalculateMissRate())
+	fmt.Printf(" (hit rate: %.4f)\n", 1-dataCache.Stats.CalculateMissRate())
+	fmt.Print("replaces: ", dataCache.Stats.Replaces)
 
 }

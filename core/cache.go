@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 )
 
 // Operations enums
@@ -49,12 +50,12 @@ func (c *Cache) Init() error {
 	if c.Options == nil {
 		return fmt.Errorf("unable to instantiate cache: options not configured")
 	}
-	if c.Options.HitPolicy == "wt" {
+	if strings.Contains(c.Options.HitPolicy, "wb") {
 		c.Options.HitPolicy = "WRITE BACK"
 	} else {
 		c.Options.HitPolicy = "WRITE THROUGH"
 	}
-	if c.Options.MissPolicy == "wa" {
+	if strings.Contains(c.Options.MissPolicy, "wa") {
 		c.Options.MissPolicy = "WRITE ALLOCATE"
 	} else {
 		c.Options.MissPolicy = "NO WRITE ALLOCATE"
